@@ -22,80 +22,115 @@ const PORT = process.env.PORT || 8282;
 app.use(express());
 app.use(cors());
 
+//this stores user data
+let clientDataArray = [];
+let usersObj = {};
 
-
-
-
-
-// const server = express()
-//   .listen(PORT, () => console.log(`Listening on ${PORT}`));
-
-// const io = socketIO(server);
-
-// io.on('connection', (socket) => {
-//   console.log('Client connected');
-
-//   socket.on('disconnect', () => console.log('Client disconnected'));
-//   socket.on("hello", ()=> console.log("User says hello"));
-// //   socket.on("time", ()=> {
-// //     setInterval(() => io.emit('time', new Date().toTimeString()), 1000);
-// //   })
-// });
-
-// setInterval(() => io.emit('time', new Date().toTimeString()), 1000);
 
 io.on("connection", (socket) => {
-    /*socket.on("new-user", (newUserData) => {
-      users[socket.id] = newUserData;
-      let isPresent = false;
-      if (clientArray.length === 0) {
-        clientArray.push(newUserData);
-      }
-      for (let i = 0; i < clientArray.length; i++) {
-        if (newUserData.name === clientArray[i].name) {
-          isPresent = true;
+  
+  /*
+   Below code will contain the connected users data
+   */
+  // console.log("Socket data");
+  // console.log(socket.id);
+    socket.on("new-user", (newUserData) => {
+        usersObj[socket.id] = newUserData;
+        
+        let isPresent = false;
+        if (clientDataArray.length === 0) {
+          clientDataArray.push(newUserData);
         }
-      }
-      if (!isPresent) {
-        clientArray.push(newUserData);
-      }
-  
-      let data = {
-        data: newUserData,
-        usersList: clientArray,
-      };
-      io.emit("user-connected", data);
-      io.emit("user-count", clientArray);
-    });*/
-  
-    // let data = { id: socket.id };
-    // socket.emit("set_id", data);
-    // socket.on("send_message", (body) => {
-    //   io.emit("message", body);
-    // });
+        for (let i = 0; i < clientDataArray.length; i++) {
+          if (newUserData.name === clientDataArray[i].name) {
+            isPresent = true;
+          }
+        }
+        if (!isPresent) {
+          clientDataArray.push(newUserData);
+        }
 
-    // socket.on("time", ()=>
-    // {
-    //     io.emit()
-    // })
+        console.log(usersObj);
+        console.log(clientDataArray);
+    
+        let data = {
+          data: newUserData,
+          usersList: clientDataArray,
+        };
+        io.emit("user-connected", data);
+        io.emit("get-user", clientDataArray);
+    });
+  
+   socket.on("current-question", (questionsData)=>
+   {
+      console.log(questionsData)
+      io.emit("get-current-question" , questionsData);
+   })
+
+   socket.on("isQuiz-start" , (data)=>
+   {
+    console.log("Data from Admin side" , data);
+    io.emit("quiz-start-bool" , data);
+   })
+
+   socket.on("set-time", (data)=>
+   {
+      //format of the data is time in seconds
+      console.log("Test Original timings are", data)
+      io.emit("get-time" , data);
+   })
+
+   
+  //  socket.on("current-user" , (userData)=>
+  //  {
+  //   console.log(userData);
+  //  })
 
     console.log("Client connected!")
+
+    socket.on("reset-test", ()=>
+    {
+      //clear everything
+      clientDataArray = [];
+      usersObj = {};
+      io.emit("get-user", clientDataArray);
+      console.log("Data cleared");
+      // console.log(clientDataArray);
+      // console.log(usersObj);
+    })
+    
   
     socket.on("disconnect", () => {
-    //   clientArray = clientArray.filter(
-    //     (item) => users[socket.id].name !== item.name
-    //   );
+      if(usersObj != undefined && clientDataArray.length != 0)
+      {
+        try
+        {
+          clientDataArray = clientDataArray.filter(
+            (item) => usersObj[socket.id].name !== item.name
+          );
+          setTimeout(() => {
+            delete usersObj[socket.id];
+          }, 2000);
+          io.emit("get-user", clientDataArray);
+        }
+        catch(e)
+        {
+          console.log(e);
+        }
+        
+      }
+      
       console.log("User Disconnected");
-    //   let disconnectObj = { name: users[socket.id].name, time: getCurrentTime() };
-    //   io.emit("show-disconnect", disconnectObj);
-    //   io.emit("user-disconnected", clientArray);
-    //   setTimeout(() => {
-    //     delete users[socket.id];
-    //   }, 2000);
+      // let disconnectObj = { name: usersObj[socket.id].name, time: getCurrentTime() };
+      // io.emit("show-disconnect", disconnectObj);
+      // io.emit("user-disconnected", clientArray);
+      
     });
   });
 
 setInterval(() => io.emit('time', new Date().toTimeString()), 1000);
+
+//setInterval(() => io.emit("hello" , "hello there"), 1000)
 
 server.listen(PORT, () => {
     console.log("Server Started at port: " + PORT);
