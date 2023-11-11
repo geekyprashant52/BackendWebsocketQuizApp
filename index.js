@@ -25,6 +25,8 @@ app.use(cors());
 //this stores user data
 let clientDataArray = [];
 let usersObj = {};
+let currentQuestion;
+let originalScoresData = [];
 
 
 io.on("connection", (socket) => {
@@ -61,8 +63,10 @@ io.on("connection", (socket) => {
         io.emit("get-user", clientDataArray);
     });
   
+    //get current question
    socket.on("current-question", (questionsData)=>
    {
+      currentQuestion = questionsData;
       console.log(questionsData)
       io.emit("get-current-question" , questionsData);
    })
@@ -78,6 +82,25 @@ io.on("connection", (socket) => {
       //format of the data is time in seconds
       console.log("Test Original timings are", data)
       io.emit("get-time" , data);
+   })
+
+   //get current answer
+   socket.on("set-answer" , (data) =>
+   {
+    if(currentQuestion != undefined)
+    {
+      if(currentQuestion.Answer_Text__c === data.answer)
+      {
+        console.log("correct answer")
+      }
+      else
+      {
+        console.log("Wrong answer")
+      }
+      console.log("Answer ");
+      console.log(data)
+    }
+    
    })
 
    
