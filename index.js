@@ -70,7 +70,7 @@ io.on("connection", (socket) => {
           };
           io.emit("user-connected", data);
           io.emit("get-user", clientDataArray);
-          io.emit("new-user-proceed" , 'proceed');
+          io.emit("new-user-proceed" , data);
         }
         else
         {
@@ -89,7 +89,7 @@ io.on("connection", (socket) => {
             };
             io.emit("user-connected", data);
             io.emit("get-user", clientDataArray);
-            io.emit("new-user-proceed" , 'proceed');
+            io.emit("new-user-proceed" , data);
           }
           else
           {
@@ -226,3 +226,17 @@ setInterval(() => io.emit('time', new Date().toTimeString()), 1000);
 server.listen(PORT, () => {
     console.log("Server Started at port: " + PORT);
 });
+
+
+/* userObj example
+{
+    name: 'Prashant',
+    passCode: 'adminPassCode',
+    clientId: 'lowz6sgzoczjsb2qipd',
+    isOnline: true,
+    isReady: false,
+    time: 1699884243107,
+    score: 0,
+    socketId: 'MgNGMx9IuKwyDYR_AAAD'
+  }
+  */
