@@ -27,6 +27,26 @@ let clientDataArray = [];
 let usersObj = {};
 let currentQuestion;
 let originalScoresData = [];
+let queStartTime;
+
+
+let getCurrentTime = () => {
+  return new Date().getTime();
+};
+
+function calculateScore(correct, startTime, endTime) {
+  //startTime - Record the start time when the user submits the answer
+  //endTime - Record the end time after checking the answer
+  const baseScore = 100;  // Points for a correct answer
+  const timePenaltyRate = 5;  // Points deducted per second
+
+  const timeTaken = (endTime - startTime) / 1000;  // Convert milliseconds to seconds
+  const score = correct ? Math.max(0, baseScore - timePenaltyRate * timeTaken) : 0;
+
+  return Math.floor(score);
+}
+
+
 
 
 io.on("connection", (socket) => {
@@ -38,29 +58,53 @@ io.on("connection", (socket) => {
   // console.log(socket.id);
     socket.on("new-user", (newUserData) => {
         usersObj[socket.id] = newUserData;
+
+        newUserData.socketId = socket.id;
         
         let isPresent = false;
         if (clientDataArray.length === 0) {
           clientDataArray.push(newUserData);
+          let data = {
+            data: newUserData,
+            usersList: clientDataArray,
+          };
+          io.emit("user-connected", data);
+          io.emit("get-user", clientDataArray);
+          io.emit("new-user-proceed" , 'proceed');
         }
-        for (let i = 0; i < clientDataArray.length; i++) {
-          if (newUserData.name === clientDataArray[i].name) {
-            isPresent = true;
+        else
+        {
+
+          for (let i = 0; i < clientDataArray.length; i++) {
+            if (newUserData.name === clientDataArray[i].name) {
+              isPresent = true;
+              break;
+            }
+          }
+          if (!isPresent) {
+            clientDataArray.push(newUserData);
+            let data = {
+              data: newUserData,
+              usersList: clientDataArray,
+            };
+            io.emit("user-connected", data);
+            io.emit("get-user", clientDataArray);
+            io.emit("new-user-proceed" , 'proceed');
+          }
+          else
+          {
+            let data = {
+              message : "Name already exist, please choose different name."
+            }
+            io.emit("new-user-error" , data);
           }
         }
-        if (!isPresent) {
-          clientDataArray.push(newUserData);
-        }
+        
 
         console.log(usersObj);
         console.log(clientDataArray);
     
-        let data = {
-          data: newUserData,
-          usersList: clientDataArray,
-        };
-        io.emit("user-connected", data);
-        io.emit("get-user", clientDataArray);
+        
     });
   
     //get current question
@@ -81,24 +125,48 @@ io.on("connection", (socket) => {
    {
       //format of the data is time in seconds
       console.log("Test Original timings are", data)
-      io.emit("get-time" , data);
+      io.emit("get-time" , data.questionOriginalTime);
+      queStartTime = data.questionStartTime;
    })
 
    //get current answer
    socket.on("set-answer" , (data) =>
    {
+    let startTime = data.time;
+    let endTime;
+    let score = 0;
     if(currentQuestion != undefined)
     {
       if(currentQuestion.Answer_Text__c === data.answer)
       {
         console.log("correct answer")
+        //here we will emit changes to admin side for leaderboard list
+        endTime = getCurrentTime();
+        score = calculateScore(true , queStartTime, endTime);
+
       }
       else
       {
+        endTime = getCurrentTime();
+        score = calculateScore(false , startTime, endTime);
         console.log("Wrong answer")
       }
+
+      if(clientDataArray != undefined)
+      {
+        for(let i=0; i<clientDataArray.length; i++)
+        {
+          if(clientDataArray[i].clientId === data.personObj.clientId)
+          {
+            clientDataArray[i].score += score;
+          }
+        }
+        io.emit("get-user", clientDataArray);
+      }
+      
       console.log("Answer ");
       console.log(data)
+      console.log(clientDataArray);
     }
     
    })
