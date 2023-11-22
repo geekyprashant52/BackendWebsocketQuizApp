@@ -19,6 +19,23 @@ const io = require('socket.io')(server, {
 require("dotenv").config();
 const PORT = process.env.PORT || 8282;
 
+// Setting up authorization starts
+const SECRET_KEY = process.env.SECRET_KEY;
+const jwt = require('jsonwebtoken');
+
+// Function to validate and decode the JWT
+const validateToken = (token) => {
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    // Perform additional validation if needed
+    return true;
+  } catch (err) {
+    return false;
+  }
+};
+//setting up authorization ends
+
+
 app.use(express());
 app.use(cors());
 
@@ -50,19 +67,39 @@ function calculateScore(correct, startTime, endTime) {
 
 
 io.on("connection", (socket) => {
-  
-  /*
-   Below code will contain the connected users data
-   */
-  // console.log("Socket data");
-  // console.log(socket.id);
-    socket.on("new-user", (newUserData) => {
-        usersObj[socket.id] = newUserData;
 
-        newUserData.socketId = socket.id;
-        
-        let isPresent = false;
-        if (clientDataArray.length === 0) {
+  
+
+  
+  
+
+    
+    socket.on("new-user", (newUserData) => {
+      usersObj[socket.id] = newUserData;
+
+      newUserData.socketId = socket.id;
+      
+      let isPresent = false;
+      if (clientDataArray.length === 0) {
+        clientDataArray.push(newUserData);
+        let data = {
+          data: newUserData,
+          usersList: clientDataArray,
+        };
+        io.emit("user-connected", data);
+        io.emit("get-user", clientDataArray);
+        io.emit("new-user-proceed" , data);
+      }
+      else
+      {
+
+        for (let i = 0; i < clientDataArray.length; i++) {
+          if (newUserData.name === clientDataArray[i].name) {
+            isPresent = true;
+            break;
+          }
+        }
+        if (!isPresent) {
           clientDataArray.push(newUserData);
           let data = {
             data: newUserData,
@@ -74,150 +111,146 @@ io.on("connection", (socket) => {
         }
         else
         {
-
-          for (let i = 0; i < clientDataArray.length; i++) {
-            if (newUserData.name === clientDataArray[i].name) {
-              isPresent = true;
-              break;
-            }
+          let data = {
+            message : "Name already exist, please choose different name."
           }
-          if (!isPresent) {
-            clientDataArray.push(newUserData);
-            let data = {
-              data: newUserData,
-              usersList: clientDataArray,
-            };
-            io.emit("user-connected", data);
-            io.emit("get-user", clientDataArray);
-            io.emit("new-user-proceed" , data);
-          }
-          else
-          {
-            let data = {
-              message : "Name already exist, please choose different name."
-            }
-            io.emit("new-user-error" , data);
-          }
+          io.emit("new-user-error" , data);
         }
-        
-
-        console.log(usersObj);
-        console.log(clientDataArray);
-    
-        
-    });
-  
-    //get current question
-   socket.on("current-question", (questionsData)=>
-   {
-      currentQuestion = questionsData;
-      console.log(questionsData)
-      io.emit("get-current-question" , questionsData);
-   })
-
-   socket.on("isQuiz-start" , (data)=>
-   {
-    console.log("Data from Admin side" , data);
-    io.emit("quiz-start-bool" , data);
-   })
-
-   socket.on("set-time", (data)=>
-   {
-      //format of the data is time in seconds
-      console.log("Test Original timings are", data)
-      io.emit("get-time" , data.questionOriginalTime);
-      queStartTime = data.questionStartTime;
-   })
-
-   //get current answer
-   socket.on("set-answer" , (data) =>
-   {
-    let startTime = data.time;
-    let endTime;
-    let score = 0;
-    if(currentQuestion != undefined)
-    {
-      if(currentQuestion.Answer_Text__c === data.answer)
-      {
-        console.log("correct answer")
-        //here we will emit changes to admin side for leaderboard list
-        endTime = getCurrentTime();
-        score = calculateScore(true , queStartTime, endTime);
-
-      }
-      else
-      {
-        endTime = getCurrentTime();
-        score = calculateScore(false , startTime, endTime);
-        console.log("Wrong answer")
-      }
-
-      if(clientDataArray != undefined)
-      {
-        for(let i=0; i<clientDataArray.length; i++)
-        {
-          if(clientDataArray[i].clientId === data.personObj.clientId)
-          {
-            clientDataArray[i].score += score;
-          }
-        }
-        io.emit("get-user", clientDataArray);
       }
       
-      console.log("Answer ");
-      console.log(data)
+
+      console.log(usersObj);
       console.log(clientDataArray);
+  
+      
+  });
+
+  //get current question
+ socket.on("current-question", (questionsData)=>
+ {
+    currentQuestion = questionsData;
+    console.log(questionsData)
+    io.emit("get-current-question" , questionsData);
+ })
+
+ socket.on("isQuiz-start" , (data)=>
+ {
+  console.log("Data from Admin side" , data);
+  io.emit("quiz-start-bool" , data);
+ })
+
+ socket.on("set-time", (data)=>
+ {
+    //format of the data is time in seconds
+    console.log("Test Original timings are", data)
+    io.emit("get-time" , data.questionOriginalTime);
+    queStartTime = data.questionStartTime;
+ })
+
+ //get chart data for client
+ socket.on("set-chart-data-client" , (data)=>
+ {
+  io.emit("get-chart-data-client" , data)
+ })
+
+ //get current answer
+ socket.on("set-answer" , (data) =>
+ {
+  let startTime = data.time;
+  let endTime;
+  let score = 0;
+  if(currentQuestion != undefined)
+  {
+    if(currentQuestion.Answer_Text__c === data.answer)
+    {
+      console.log("correct answer")
+      //here we will emit changes to admin side for leaderboard list
+      endTime = getCurrentTime();
+      score = calculateScore(true , queStartTime, endTime);
+
+    }
+    else
+    {
+      endTime = getCurrentTime();
+      score = calculateScore(false , startTime, endTime);
+      console.log("Wrong answer")
+    }
+
+    if(clientDataArray != undefined)
+    {
+      for(let i=0; i<clientDataArray.length; i++)
+      {
+        if(clientDataArray[i].clientId === data.personObj.clientId)
+        {
+          clientDataArray[i].score += score;
+        }
+      }
+      io.emit("get-user", clientDataArray);
     }
     
-   })
-
-   
-  //  socket.on("current-user" , (userData)=>
-  //  {
-  //   console.log(userData);
-  //  })
-
-    console.log("Client connected!")
-
-    socket.on("reset-test", ()=>
-    {
-      //clear everything
-      clientDataArray = [];
-      usersObj = {};
-      io.emit("get-user", clientDataArray);
-      console.log("Data cleared");
-      // console.log(clientDataArray);
-      // console.log(usersObj);
-    })
-    
+    console.log("Answer ");
+    console.log(data)
+    console.log(clientDataArray);
+  }
   
-    socket.on("disconnect", () => {
-      if(usersObj != undefined && clientDataArray.length != 0)
+ })
+
+ 
+//  socket.on("current-user" , (userData)=>
+//  {
+//   console.log(userData);
+//  })
+
+  console.log("Client connected!")
+
+  socket.on("reset-test", ()=>
+  {
+    //clear everything
+    clientDataArray = [];
+    usersObj = {};
+    io.emit("get-user", clientDataArray);
+    console.log("Data cleared");
+    // console.log(clientDataArray);
+    // console.log(usersObj);
+  })
+  
+
+  socket.on("disconnect", () => {
+    if(usersObj != undefined && clientDataArray.length != 0)
+    {
+      try
       {
-        try
-        {
-          clientDataArray = clientDataArray.filter(
-            (item) => usersObj[socket.id].name !== item.name
-          );
-          setTimeout(() => {
-            delete usersObj[socket.id];
-          }, 2000);
-          io.emit("get-user", clientDataArray);
-        }
-        catch(e)
-        {
-          console.log(e);
-        }
-        
+        currentQuestion = null;
+        clientDataArray = clientDataArray.filter(
+          (item) => usersObj[socket.id].name !== item.name
+        );
+        setTimeout(() => {
+          delete usersObj[socket.id];
+        }, 2000);
+        io.emit("get-user", clientDataArray);
+      }
+      catch(e)
+      {
+        console.log(e);
       }
       
-      console.log("User Disconnected");
-      // let disconnectObj = { name: usersObj[socket.id].name, time: getCurrentTime() };
-      // io.emit("show-disconnect", disconnectObj);
-      // io.emit("user-disconnected", clientArray);
-      
-    });
+    }
+    
+    console.log("User Disconnected");
+    // let disconnectObj = { name: usersObj[socket.id].name, time: getCurrentTime() };
+    // io.emit("show-disconnect", disconnectObj);
+    // io.emit("user-disconnected", clientArray);
+    
   });
+
+  
+  /*
+   Below code will contain the connected users data
+   */
+  // console.log("Socket data");
+  // console.log(socket.id);
+    
+});
 
 setInterval(() => io.emit('time', new Date().toTimeString()), 1000);
 
